@@ -19,6 +19,15 @@ export default {
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
     '!src/setupTests.ts',
+    '!src/example.tsx',
+    '!src/**/*.test.{ts,tsx}',
+    '!src/**/__tests__/**',
+  ],
+  coverageReporters: [
+    'text',
+    'html',
+    'lcov',
+    'json-summary'
   ],
   coverageThreshold: {
     global: {

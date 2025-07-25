@@ -1,122 +1,209 @@
-// Simple unit tests for the single tab enforcer functionality
+import { renderHook, act } from '@testing-library/react';
+import { useSingleTabEnforcer } from './useSingleTabEnforcer';
 
 // Mock localStorage
-const localStorageMock = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
-};
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: jest.fn((key: string) => store[key] || null),
+    setItem: jest.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    removeItem: jest.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: jest.fn(() => {
+      store = {};
+    }),
+  };
+})();
 
-Object.defineProperty(global, 'localStorage', {
+Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,
-  writable: true
 });
 
-// Test the core logic functions independently
-describe('Single Tab Enforcer Core Logic', () => {
+// Mock timers
+jest.useFakeTimers();
+
+describe('useSingleTabEnforcer Hook', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    localStorageMock.getItem.mockReturnValue(null);
+    localStorageMock.clear();
+    jest.clearAllTimers();
   });
 
-  it('should generate unique tab IDs with correct format', () => {
-    // Import the generateTabId function by testing its output pattern
-    const tabId1 = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const tabId2 = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    expect(tabId1).toMatch(/^tab-\d+-[a-z0-9]+$/);
-    expect(tabId2).toMatch(/^tab-\d+-[a-z0-9]+$/);
-    expect(tabId1).not.toBe(tabId2); // Should be unique
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+    jest.useFakeTimers();
   });
 
-  it('should create correct storage key with app name', () => {
-    const appName = 'test-app';
-    const expectedKey = `single-tab-${appName}`;
-    expect(expectedKey).toBe('single-tab-test-app');
+  it('should become leader when no other tabs exist', () => {
+    const { result } = renderHook(() => useSingleTabEnforcer());
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(result.current.isLeader).toBe(true);
+    expect(localStorageMock.setItem).toHaveBeenCalled();
   });
 
-  it('should handle expired timestamp detection', () => {
-    const now = Date.now();
-    const timeout = 5000;
-    
-    // Test expired timestamp
-    const expiredTimestamp = now - 10000; // 10 seconds ago
-    const isExpired = (now - expiredTimestamp) > timeout;
-    expect(isExpired).toBe(true);
-    
-    // Test valid timestamp
-    const validTimestamp = now - 2000; // 2 seconds ago
-    const isValid = (now - validTimestamp) <= timeout;
-    expect(isValid).toBe(true);
-  });
-
-  it('should handle localStorage getItem correctly', () => {
-    const storageKey = 'single-tab-my-app';
-    
-    // Test when no data exists
-    localStorageMock.getItem.mockReturnValue(null);
-    const result1 = localStorage.getItem(storageKey);
-    expect(result1).toBe(null);
-    
-    // Test when data exists
-    const testData = JSON.stringify({ id: 'test-id', timestamp: Date.now() });
-    localStorageMock.getItem.mockReturnValue(testData);
-    const result2 = localStorage.getItem(storageKey);
-    const parsed = result2 ? JSON.parse(result2) : null;
-    expect(parsed).toHaveProperty('id', 'test-id');
-    expect(parsed).toHaveProperty('timestamp');
-  });
-
-  it('should handle localStorage setItem correctly', () => {
-    const storageKey = 'single-tab-my-app';
-    const tabId = 'test-tab-id';
-    const timestamp = Date.now();
-    
-    const dataToStore = JSON.stringify({ id: tabId, timestamp });
-    localStorage.setItem(storageKey, dataToStore);
-    
-    expect(localStorageMock.setItem).toHaveBeenCalledWith(storageKey, dataToStore);
-  });
-
-  it('should handle JSON parsing errors gracefully', () => {
-    const storageKey = 'single-tab-my-app';
-    
-    // Mock invalid JSON
-    localStorageMock.getItem.mockReturnValue('invalid-json');
-    
-    let data = null;
-    try {
-      const stored = localStorage.getItem(storageKey);
-      data = stored ? JSON.parse(stored) : null;
-    } catch (error) {
-      // Should handle parsing error
-      expect(error).toBeInstanceOf(SyntaxError);
-    }
-    
-    expect(data).toBe(null);
-  });
-
-  it('should determine leadership correctly based on different scenarios', () => {
-    const now = Date.now();
-    const timeout = 5000;
-    const currentTabId = 'current-tab';
-    
-    // Helper function to check leadership
-    const checkLeadership = (data: { id: string; timestamp: number } | null) => {
-      return !data || (now - data.timestamp) > timeout || data.id === currentTabId;
+  it('should not become leader when another tab exists', () => {
+    // Simulate another tab's record
+    const existingRecord = {
+      id: 'existing-tab',
+      timestamp: Date.now(),
     };
+    localStorageMock.setItem('single-tab-my-app', JSON.stringify(existingRecord));
+
+    const { result } = renderHook(() => useSingleTabEnforcer());
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(result.current.isLeader).toBe(false);
+  });
+
+  it('should take over leadership when existing tab times out', () => {
+    // Simulate an expired tab record
+    const expiredRecord = {
+      id: 'expired-tab',
+      timestamp: Date.now() - 10000, // 10 seconds ago (older than default 5s timeout)
+    };
+    localStorageMock.setItem('single-tab-my-app', JSON.stringify(expiredRecord));
+
+    const { result } = renderHook(() => useSingleTabEnforcer());
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(result.current.isLeader).toBe(true);
+  });
+
+  it('should force leadership when forceLeadership is called', () => {
+    // Set up existing tab
+    const existingRecord = {
+      id: 'existing-tab',
+      timestamp: Date.now(),
+    };
+    localStorageMock.setItem('single-tab-my-app', JSON.stringify(existingRecord));
+
+    const { result } = renderHook(() => useSingleTabEnforcer());
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(result.current.isLeader).toBe(false);
+
+    act(() => {
+      result.current.forceLeadership();
+    });
+
+    expect(result.current.isLeader).toBe(true);
+  });
+
+  it('should use custom app name in storage key', () => {
+    const customAppName = 'my-custom-app';
+    renderHook(() => useSingleTabEnforcer({ appName: customAppName }));
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(localStorageMock.setItem).toHaveBeenCalledWith(
+      `single-tab-${customAppName}`,
+      expect.any(String)
+    );
+  });
+
+  it('should use custom timeout value', () => {
+    const customTimeout = 3000;
     
-    // Test case 1: No existing data - should become leader
-    expect(checkLeadership(null)).toBe(true);
+    // Set up expired tab with custom timeout
+    const expiredRecord = {
+      id: 'expired-tab',
+      timestamp: Date.now() - 4000, // 4 seconds ago
+    };
+    localStorageMock.setItem('single-tab-my-app', JSON.stringify(expiredRecord));
+
+    const { result } = renderHook(() => 
+      useSingleTabEnforcer({ timeout: customTimeout })
+    );
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(result.current.isLeader).toBe(true);
+  });
+
+  it('should update timestamp periodically when leader', () => {
+    const { result } = renderHook(() => useSingleTabEnforcer());
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(result.current.isLeader).toBe(true);
+    const initialCalls = localStorageMock.setItem.mock.calls.length;
+
+    // Fast-forward time to trigger interval (default is 2000ms)
+    act(() => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    expect(localStorageMock.setItem.mock.calls.length).toBeGreaterThan(initialCalls);
+  });
+
+  it('should clean up on unmount', () => {
+    const { result, unmount } = renderHook(() => useSingleTabEnforcer());
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(result.current.isLeader).toBe(true);
+
+    unmount();
+
+    // Should clean up storage if this tab was leader
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('single-tab-my-app');
+  });
+
+  it('should handle localStorage errors gracefully', () => {
+    // Create a separate mock just for this test
+    const errorLocalStorageMock = {
+      ...localStorageMock,
+      setItem: jest.fn(() => {
+        throw new Error('Storage quota exceeded');
+      }),
+    };
+
+    Object.defineProperty(window, 'localStorage', {
+      value: errorLocalStorageMock,
+    });
+
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+    const { result } = renderHook(() => useSingleTabEnforcer());
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    // Should not crash and should handle error gracefully
+    expect(result.current.isLeader).toBe(true); // Should fail safe to leader
+    expect(consoleSpy).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
     
-    // Test case 2: Expired leader - should become leader
-    expect(checkLeadership({ id: 'other-tab', timestamp: now - 10000 })).toBe(true);
-    
-    // Test case 3: Current tab is already leader - should stay leader
-    expect(checkLeadership({ id: currentTabId, timestamp: now - 1000 })).toBe(true);
-    
-    // Test case 4: Another tab is active leader - should not be leader
-    expect(checkLeadership({ id: 'other-tab', timestamp: now - 1000 })).toBe(false);
+    // Restore original localStorage mock
+    Object.defineProperty(window, 'localStorage', {
+      value: localStorageMock,
+    });
   });
 });
