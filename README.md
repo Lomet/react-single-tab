@@ -1,240 +1,158 @@
 # React Single Tab Enforcer
 
-A modern, robust React hook for enforcing single-tab behavior in web applications with TypeScript support.
+A simple React hook for enforcing single-tab behavior with TypeScript support. Only one tab can be the "leader" at a time, perfect for applications where multiple tabs could cause conflicts.
 
-[![npm version](https://badge.fury.io/js/react-single-tab-enforcer.svg)](https://badge.fury.io/js/react-single-tab-enforcer)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg)](http://www.typescriptlang.org/)
+## Features
 
-## ✨ Features
+- 🔒 **Single Tab Leadership** - Only one tab is active (leader) at a time
+- ⚡ **Automatic Switching** - When leader tab closes, another tab automatically takes over
+- 🔄 **Real-time Updates** - Uses localStorage events for instant cross-tab communication
+- ⏱️ **Timeout Handling** - Configurable timeout for inactive leaders
+- 🛡️ **TypeScript Support** - Full TypeScript definitions included
+- 🎯 **Simple API** - Just one hook with clear return values
 
-- 🎯 **Modern Hook API** - Clean, declarative React hook interface
-- 🔧 **TypeScript Support** - Full type safety with included type definitions
-- ⚡ **Fast Communication** - Uses BroadcastChannel API when available, falls back to localStorage
-- 🛡️ **Robust Error Handling** - Graceful fallbacks for storage limitations and browser compatibility
-- 🎨 **Customizable UI** - Provide your own fallback component or use the built-in one
-- 🧪 **Well Tested** - Comprehensive test suite with >80% coverage
-- 📦 **Zero Dependencies** - Only requires React as a peer dependency
-- 🔄 **Automatic Cleanup** - Handles tab close events and memory cleanup
-- 🎛️ **Configurable** - Timeout, intervals, and behavior options
-
-## 🚀 Installation
+## Installation
 
 ```bash
 npm install react-single-tab-enforcer
 ```
 
-or
+## Basic Usage
 
-```bash
-yarn add react-single-tab-enforcer
-```
-
-## 📖 Basic Usage
-
-```tsx
+```javascript
 import React from 'react';
 import { useSingleTabEnforcer } from 'react-single-tab-enforcer';
 
 function App() {
-  const { isLeader, fallbackComponent } = useSingleTabEnforcer({
-    appName: 'my-awesome-app',
-    timeout: 15000,
-  });
-
-  // If this tab is not the leader, show fallback
-  if (!isLeader) {
-    return fallbackComponent;
-  }
-
-  // Your main app content
-  return (
-    <div>
-      <h1>My App</h1>
-      <p>This will only render in one tab at a time!</p>
-    </div>
-  );
-}
-
-export default App;
-```
-
-## 🎛️ Configuration Options
-
-```tsx
-interface SingleTabConfig {
-  /** Unique identifier for your application */
-  appName?: string; // default: 'my-app'
-  
-  /** Timeout before a tab is considered abandoned (ms) */
-  timeout?: number; // default: 15000
-  
-  /** Interval for checking tab leadership (ms) */
-  interval?: number; // default: 10000
-  
-  /** Custom component to show when another tab is active */
-  fallbackComponent?: ReactNode;
-  
-  /** Use BroadcastChannel for faster communication */
-  useBroadcastChannel?: boolean; // default: true
-  
-  /** Custom storage key prefix */
-  storagePrefix?: string; // default: 'single-tab'
-  
-  /** Enable debug logging */
-  debug?: boolean; // default: false
-  
-  /** Callback when tab becomes leader */
-  onBecomeLeader?: () => void;
-  
-  /** Callback when tab loses leadership */
-  onLoseLeadership?: () => void;
-  
-  /** Callback when another tab is detected */
-  onTabDetected?: () => void;
-}
-```
-
-## 🎨 Custom Fallback Component
-
-```tsx
-import { useSingleTabEnforcer } from 'react-single-tab-enforcer';
-
-const CustomFallback = () => (
-  <div style={{ padding: '20px', textAlign: 'center' }}>
-    <h2>🚫 App Already Open</h2>
-    <p>Please close this tab and use the existing one.</p>
-    <button onClick={() => window.close()}>Close Tab</button>
-  </div>
-);
-
-function App() {
-  const { isLeader, fallbackComponent } = useSingleTabEnforcer({
+  const { isLeader, forceLeadership } = useSingleTabEnforcer({
     appName: 'my-app',
-    fallbackComponent: <CustomFallback />,
+    timeout: 5000
   });
-
-  return isLeader ? <MainApp /> : fallbackComponent;
-}
-```
-
-## 🔍 Advanced Usage with State and Methods
-
-```tsx
-import { useSingleTabEnforcer } from 'react-single-tab-enforcer';
-
-function App() {
-  const {
-    isLeader,
-    tabId,
-    tabCount,
-    isChecking,
-    fallbackComponent,
-    forceLeadership,
-    checkLeadership,
-    getCurrentRecord,
-  } = useSingleTabEnforcer({
-    appName: 'advanced-app',
-    debug: true,
-    onBecomeLeader: () => console.log('Became leader!'),
-    onLoseLeadership: () => console.log('Lost leadership'),
-    onTabDetected: () => console.log('Another tab detected'),
-  });
-
-  if (!isLeader) {
-    return (
-      <div>
-        {fallbackComponent}
-        <button onClick={forceLeadership}>
-          Force Take Control
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div>
-      <h1>Leader Tab</h1>
-      <p>Tab ID: {tabId}</p>
-      <p>Tab Count: {tabCount}</p>
-      <p>Checking: {isChecking ? 'Yes' : 'No'}</p>
-      <button onClick={checkLeadership}>Manual Check</button>
-      <button onClick={() => console.log(getCurrentRecord())}>
-        Log Current Record
+      <h1>{isLeader ? 'Leader Tab' : 'Follower Tab'}</h1>
+      <p>
+        {isLeader 
+          ? 'This tab is in control' 
+          : 'Another tab is currently active'
+        }
+      </p>
+      <button onClick={forceLeadership}>
+        Force Leadership
       </button>
     </div>
   );
 }
 ```
 
-## 🔧 Utility Functions
+## API
 
-```tsx
-import {
-  generateTabId,
-  isBroadcastChannelSupported,
-  isLocalStorageAvailable,
-} from 'react-single-tab-enforcer';
+### `useSingleTabEnforcer(config)`
 
-// Generate a unique tab ID
-const tabId = generateTabId();
+#### Parameters
 
-// Check browser support
-if (isBroadcastChannelSupported()) {
-  console.log('BroadcastChannel is supported');
-}
+- **config** (optional): Configuration object
+  - **appName** (string, default: 'my-app'): Unique identifier for your app
+  - **timeout** (number, default: 5000): Milliseconds before a tab is considered inactive
 
-if (isLocalStorageAvailable()) {
-  console.log('localStorage is available');
-}
-```
+#### Returns
 
-## 🧪 Testing
+- **isLeader** (boolean): Whether this tab is currently the leader
+- **forceLeadership** (function): Force this tab to become the leader
 
-The package includes comprehensive tests. To run them:
+## How It Works
+
+1. **Leadership Election**: When multiple tabs are open, only one becomes the leader
+2. **Heartbeat System**: Leader tabs update their timestamp every 2 seconds
+3. **Storage Events**: Tabs listen for localStorage changes to react instantly
+4. **Automatic Cleanup**: When a tab closes, it cleans up its storage entry
+5. **Timeout Handling**: If a leader becomes inactive, others can take over
+
+## Example Use Cases
+
+- **Database Connections**: Only one tab maintains the real-time connection
+- **Background Sync**: Prevent multiple tabs from syncing simultaneously
+- **Resource Management**: Avoid conflicts in resource-intensive operations
+- **User Experience**: Show different UI states for active vs inactive tabs
+
+## Running the Demo
+
+To see the hook in action:
 
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd react-single-tab-enforcer
+
+# Install dependencies
+npm install
+
+# Start the demo app
+cd demo-app
+npm install
+npm start
+```
+
+Then:
+1. Open `http://localhost:3000` in multiple browser tabs
+2. Watch how only one tab becomes the "leader" (green)
+3. Close the leader tab and see another tab take over
+4. Try the "Force Leadership" button to steal control
+
+## Configuration Examples
+
+### Basic Setup
+```javascript
+const { isLeader } = useSingleTabEnforcer();
+```
+
+### Custom App Name
+```javascript
+const { isLeader } = useSingleTabEnforcer({
+  appName: 'chat-app'
+});
+```
+
+### Custom Timeout
+```javascript
+const { isLeader } = useSingleTabEnforcer({
+  appName: 'sync-app',
+  timeout: 10000 // 10 seconds
+});
+```
+
+## Browser Support
+
+Works in all modern browsers that support:
+- localStorage
+- Storage events
+- React 16.8+ (hooks)
+
+## License
+
+MIT
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Make your changes
+4. Test with the demo app
+5. Submit a pull request
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run tests
 npm test
+
+# Build the package
+npm run build
+
+# Run the demo
+cd demo-app && npm start
 ```
-
-For coverage:
-
-```bash
-npm run test:coverage
-```
-
-## 🏗️ How It Works
-
-1. **Tab Registration**: Each tab generates a unique ID and attempts to register as the leader
-2. **Leadership Logic**: Only one tab can be leader at a time, determined by localStorage timestamps
-3. **Communication**: Tabs communicate via BroadcastChannel (fast) or storage events (fallback)
-4. **Timeout Handling**: Abandoned tabs (crashed, closed) are detected via timestamp expiration
-5. **Cleanup**: Proper cleanup on tab close prevents ghost tabs
-
-## 🌐 Browser Support
-
-- **Modern Browsers**: Full support with BroadcastChannel
-- **Legacy Browsers**: Fallback to localStorage + storage events
-- **Required**: localStorage support (available in all modern browsers)
-
-## 📝 TypeScript
-
-This package is written in TypeScript and includes complete type definitions. No additional `@types` packages needed!
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our contributing guidelines and submit PRs to the main branch.
-
-## 📄 License
-
-MIT © [Your Name]
-
-## 🔗 Links
-
-- [GitHub Repository](https://github.com/yourusername/react-single-tab-enforcer)
-- [NPM Package](https://www.npmjs.com/package/react-single-tab-enforcer)
-- [Issues](https://github.com/yourusername/react-single-tab-enforcer/issues)
-
----
-
-Made with ❤️ for the React community
