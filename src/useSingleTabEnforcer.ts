@@ -19,6 +19,8 @@ export function useSingleTabEnforcer(config: Config = {}) {
   const tabId = useRef(generateTabId());
 
   useEffect(() => {
+    const currentTabId = tabId.current;
+    
     const checkLeadership = () => {
       try {
         const stored = localStorage.getItem(storageKey);
@@ -26,9 +28,9 @@ export function useSingleTabEnforcer(config: Config = {}) {
         const now = Date.now();
 
         // No leader or expired, OR this tab is already leader - take/keep leadership
-        if (!data || (now - data.timestamp) > timeout || data.id === tabId.current) {
+        if (!data || (now - data.timestamp) > timeout || data.id === currentTabId) {
           localStorage.setItem(storageKey, JSON.stringify({
-            id: tabId.current,
+            id: currentTabId,
             timestamp: now
           }));
           setIsLeader(true);
@@ -65,7 +67,7 @@ export function useSingleTabEnforcer(config: Config = {}) {
       // Clean up storage when component unmounts if this tab was leader
       const stored = localStorage.getItem(storageKey);
       const data = stored ? JSON.parse(stored) : null;
-      if (data && data.id === tabId.current) {
+      if (data && data.id === currentTabId) {
         localStorage.removeItem(storageKey);
       }
     };
