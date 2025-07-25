@@ -25,21 +25,13 @@ export function useSingleTabEnforcer(config: Config = {}) {
         const data = stored ? JSON.parse(stored) : null;
         const now = Date.now();
 
-        // No leader or expired - take leadership
-        if (!data || (now - data.timestamp) > timeout) {
+        // No leader or expired, OR this tab is already leader - take/keep leadership
+        if (!data || (now - data.timestamp) > timeout || data.id === tabId.current) {
           localStorage.setItem(storageKey, JSON.stringify({
             id: tabId.current,
             timestamp: now
           }));
           setIsLeader(true);
-        }
-        // This tab is already leader - update timestamp
-        else if (data.id === tabId.current) {
-          localStorage.setItem(storageKey, JSON.stringify({
-            id: tabId.current,
-            timestamp: now
-          }));
-          // Already leader, no need to set again
         }
         // Another tab is leader
         else {
@@ -70,12 +62,14 @@ export function useSingleTabEnforcer(config: Config = {}) {
       clearInterval(interval);
       window.removeEventListener('storage', handleStorage);
       
-      // Clean up storage if this tab was leader
-      if (isLeader) {
+      // Clean up storage when component unmounts if this tab was leader
+      const stored = localStorage.getItem(storageKey);
+      const data = stored ? JSON.parse(stored) : null;
+      if (data && data.id === tabId.current) {
         localStorage.removeItem(storageKey);
       }
     };
-  }, [storageKey, timeout, isLeader]);
+  }, [storageKey, timeout]);
 
   const forceLeadership = () => {
     localStorage.setItem(storageKey, JSON.stringify({
