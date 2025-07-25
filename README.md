@@ -1,5 +1,11 @@
 # React Single Tab Enforcer
 
+[![CI](https://github.com/Lomet/react-single-tab/actions/workflows/ci.yml/badge.svg)](https://github.com/Lomet/react-single-tab/actions/workflows/ci.yml)
+[![Coverage](https://github.com/Lomet/react-single-tab/actions/workflows/coverage.yml/badge.svg)](https://github.com/Lomet/react-single-tab/actions/workflows/coverage.yml)
+[![NPM Version](https://img.shields.io/npm/v/react-single-tab-enforcer.svg)](https://www.npmjs.com/package/react-single-tab-enforcer)
+[![NPM Downloads](https://img.shields.io/npm/dm/react-single-tab-enforcer.svg)](https://www.npmjs.com/package/react-single-tab-enforcer)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A simple React hook for enforcing single-tab behavior with TypeScript support. Only one tab can be the "leader" at a time, perfect for applications where multiple tabs could cause conflicts.
 
 ## Features
